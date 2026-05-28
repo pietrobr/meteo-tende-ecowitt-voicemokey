@@ -66,7 +66,7 @@ def setup_logging(cfg: dict) -> logging.Logger:
     if log_file:
         fh = logging.handlers.RotatingFileHandler(
             log_file,
-            maxBytes=int(log_cfg.get("max_bytes", 1_048_576)),
+            maxBytes=int(log_cfg.get("max_bytes", 2_097_152)),
             backupCount=int(log_cfg.get("backup_count", 5)),
             encoding="utf-8",
         )

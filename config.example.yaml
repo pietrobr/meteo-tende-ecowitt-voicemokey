@@ -52,5 +52,5 @@ polling:
 logging:
   level: "INFO"                          # DEBUG, INFO, WARNING, ERROR
   file: "meteo_tende.log"
-  max_bytes: 1048576                     # 1 MB
-  backup_count: 5
+  max_bytes: 2097152                     # 2 MB (rotazione automatica)
+  backup_count: 5                        # max 5 file ruotati => ~12 MB totali
