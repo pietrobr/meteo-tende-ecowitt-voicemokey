@@ -1,0 +1,56 @@
+# =======================================================
+# Configurazione meteo-tende-ecowitt-voicemonkey (ESEMPIO)
+# =======================================================
+# Copia questo file in `config.yaml` e compila i campi con i tuoi valori.
+# `config.yaml` e' gitignored e non deve mai essere committato.
+
+ecowitt:
+  # API Ecowitt: https://doc.ecowitt.net/
+  application_key: "INSERISCI_APPLICATION_KEY"
+  api_key: "INSERISCI_API_KEY"
+  mac: "AA:BB:CC:DD:EE:FF"               # MAC address della stazione
+  # Unità di misura richieste all'API
+  wind_speed_unitid: 7                   # 7 = km/h, 6 = m/s, 9 = mph
+  rainfall_unitid: 12                    # 12 = mm, 13 = in
+  base_url: "https://api.ecowitt.net/api/v3/device/real_time"
+
+voicemonkey:
+  # API Voice Monkey v1 (trigger):
+  #   https://api.voicemonkey.io/trigger?access_token=...&secret_token=...&monkey=monkeytende
+  access_token: "INSERISCI_ACCESS_TOKEN"
+  secret_token: "INSERISCI_SECRET_TOKEN"
+  monkey: "monkeytende"
+  base_url: "https://api.voicemonkey.io/trigger"
+
+soglie:
+  # Velocità vento sostenuta (km/h) oltre la quale alzare le tende
+  wind_speed_max: 14.0
+  # Raffica di vento (km/h) oltre la quale alzare le tende
+  wind_gust_max: 20.0
+  # Intensità pioggia (mm/h) oltre la quale alzare le tende.
+  # Imposta 0.0 per scatenare a qualsiasi accenno di pioggia.
+  rain_rate_max: 0.2
+
+isteresi:
+  # Vedi README per la spiegazione della macchina a stati IDLE/TRIGGERED.
+  cooldown_minutes: 60
+  reset_minutes: 30
+  reset_margin: 0.8
+
+orario:
+  # Servizio attivo solo in questa fascia oraria (locale)
+  ora_inizio: "10:00"
+  ora_fine: "19:00"
+  # Mesi attivi (1=gennaio ... 12=dicembre)
+  mese_inizio: 4    # aprile
+  mese_fine: 10     # ottobre
+
+polling:
+  interval_seconds: 60
+  http_timeout_seconds: 15
+
+logging:
+  level: "INFO"                          # DEBUG, INFO, WARNING, ERROR
+  file: "meteo_tende.log"
+  max_bytes: 1048576                     # 1 MB
+  backup_count: 5
