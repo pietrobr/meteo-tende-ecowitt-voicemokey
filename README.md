@@ -162,11 +162,110 @@ launchctl unload ~/Library/LaunchAgents/com.pietrobr.meteotende.plist
 rm ~/Library/LaunchAgents/com.pietrobr.meteotende.plist
 ```
 
-## Esecuzione come servizio Linux (systemd)
+## Esecuzione su Raspberry Pi (Pi 2 / Raspberry Pi OS)
 
-`/etc/systemd/system/meteo-tende.service`:
+Il Raspberry Pi 2 (ARMv7, 1 GB RAM) e' piu' che sufficiente per questo
+servizio: i requisiti sono trascurabili (un HTTP request al minuto).
+La procedura vale anche per Pi 3 / Pi 4 / Pi Zero 2.
+
+### Prerequisiti
+
+Su Raspberry Pi OS (Bookworm o Bullseye):
+
+```bash
+sudo apt update
+sudo apt install -y python3 python3-venv python3-pip git
+python3 --version   # deve essere >= 3.9
+```
+
+> **Nota Pi 2 (32-bit)**: se sei ancora su Bullseye e Python e' troppo vecchio,
+> aggiorna a Raspberry Pi OS Bookworm (Python 3.11). Le dipendenze del progetto
+> sono pure Python, quindi NON serve compilare nulla con `gcc`.
+
+### Installazione
+
+```bash
+# 1. Clona il repo (o copia i file via scp)
+cd /opt
+sudo git clone https://github.com/pietrobr/meteo-tende-ecowitt-voicemokey.git meteo-tende
+sudo chown -R pi:pi /opt/meteo-tende
+cd /opt/meteo-tende
+
+# 2. Crea venv + dipendenze
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+# 3. Crea config.yaml dal template e compila i secret
+cp config.example.yaml config.yaml
+nano config.yaml
+
+# 4. Test rapido
+python meteo_tende.py --test-trigger    # invia trigger Voice Monkey
+python meteo_tende.py --check-meteo     # legge una volta dalla stazione
+```
+
+### Avvio come servizio (systemd)
+
+Crea `/etc/systemd/system/meteo-tende.service`:
 
 ```ini
+[Unit]
+Description=Meteo Tende Ecowitt VoiceMonkey
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/opt/meteo-tende
+ExecStart=/opt/meteo-tende/.venv/bin/python /opt/meteo-tende/meteo_tende.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now meteo-tende
+sudo systemctl status meteo-tende
+journalctl -u meteo-tende -f          # log in tempo reale
+```
+
+### Aggiornamento del codice
+
+```bash
+cd /opt/meteo-tende
+sudo systemctl stop meteo-tende
+git pull
+.venv/bin/pip install -r requirements.txt
+sudo systemctl start meteo-tende
+```
+
+### Disinstallazione
+
+```bash
+sudo systemctl disable --now meteo-tende
+sudo rm /etc/systemd/system/meteo-tende.service
+sudo systemctl daemon-reload
+sudo rm -rf /opt/meteo-tende
+```
+
+### Accorgimenti per esecuzione 24/7 su Pi
+
+- Imposta il fuso orario corretto: `sudo raspi-config` → Localisation → Timezone
+  (l'orario del config `ora_inizio` / `ora_fine` usa il tempo locale del Pi).
+- Sincronizza l'ora con NTP (gia' attivo di default su Raspberry Pi OS).
+- Se usi una microSD, il log e' su `/opt/meteo-tende/meteo_tende.log` con
+  rotazione automatica (~12 MB max), quindi non usurera' la scheda.
+- Considera di alimentare il Pi con un alimentatore ufficiale 2.5A+ per
+  evitare brown-out durante l'uso 24/7.
+
+## Esecuzione come servizio Linux (systemd, generico)
+
+`/etc/systemd/system/meteo-tende.service`:
 [Unit]
 Description=Meteo Tende Ecowitt VoiceMonkey
 After=network-online.target
