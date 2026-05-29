@@ -244,6 +244,46 @@ git pull
 sudo systemctl start meteo-tende
 ```
 
+### Health check (`scripts/healthcheck.sh`)
+
+Script di verifica salute del servizio, da eseguire sul Pi dopo l'installazione
+o per troubleshooting. Esegue 9 controlli: unit systemd presente, `active`,
+`enabled`, restart counter, processo Python in esecuzione (PID + `/proc`),
+freschezza del log applicazione, assenza di `ERROR`/`CRITICAL` nelle ultime
+righe, connettivita' verso Ecowitt e Voice Monkey, `config.yaml` leggibile.
+
+```bash
+cd ~/meteo-tende-ecowitt-voicemokey   # o /opt/meteo-tende
+chmod +x scripts/healthcheck.sh        # solo la prima volta
+./scripts/healthcheck.sh               # esecuzione normale (terminale)
+./scripts/healthcheck.sh --verbose     # mostra dettagli extra (PID, RSS, ecc.)
+./scripts/healthcheck.sh --pause       # forza pausa "premi un tasto" prima di uscire
+```
+
+**Exit code**: `0` = tutto OK (anche con soli WARN), `1` = almeno un FAIL.
+
+**Comportamenti notevoli**:
+
+- Il log applicazione viene scritto solo in presenza di eventi (trigger,
+  warning, rientro). Se rimane fermo a lungo con meteo calmo lo script genera
+  al massimo un `WARN` (mai un `FAIL`): la vera prova di vita e' il processo
+  Python verificato via `MainPID` + `/proc/<pid>`.
+- Le API Ecowitt e Voice Monkey vengono considerate raggiungibili anche se
+  rispondono con codici HTTP non‑2xx (es. 404 sulla root): cio' che conta e'
+  che il server abbia risposto in tempo (TCP + TLS + HTTP OK).
+- **Auto‑pausa a doppio click**: se lo script viene lanciato dal file manager
+  o da una shortcut Desktop (processo padre non‑shell), aspetta automaticamente
+  la pressione di un tasto prima di chiudere la finestra, cosi' i risultati
+  restano leggibili. Da terminale il comportamento e' invariato (nessuna pausa,
+  salvo `--pause`).
+
+Shortcut sul Desktop del Pi:
+
+```bash
+ln -sf ~/meteo-tende-ecowitt-voicemokey/scripts/healthcheck.sh ~/Desktop/healthcheck.sh
+chmod +x ~/meteo-tende-ecowitt-voicemokey/scripts/healthcheck.sh
+```
+
 ### Disinstallazione
 
 ```bash
