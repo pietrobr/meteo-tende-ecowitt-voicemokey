@@ -145,16 +145,20 @@ else
 fi
 
 # ---- 8. connettività verso le API ------------------------------------------
+# Verifichiamo solo che il server risponda (TCP+TLS+HTTP), non importa il
+# codice (la root di queste API può restituire 404, ma il servizio è up).
 section "connettività"
 check_url() {
   local name="$1" url="$2"
-  if curl -fsS --max-time 5 -o /dev/null "${url}"; then
-    pass "${name} raggiungibile"
+  local code
+  code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 5 "${url}" 2>/dev/null || echo "000")
+  if [[ "${code}" != "000" ]]; then
+    pass "${name} raggiungibile (HTTP ${code})"
   else
     warn "${name} non raggiungibile (${url})"
   fi
 }
-check_url "Ecowitt API"     "https://api.ecowitt.net/"
+check_url "Ecowitt API"      "https://api.ecowitt.net/"
 check_url "Voice Monkey API" "https://api.voicemonkey.io/"
 
 # ---- 9. config.yaml --------------------------------------------------------
