@@ -34,7 +34,23 @@ MAX_LOG_AGE_MINUTES=60        # soglia "soft": il log viene toccato solo quando 
 ERROR_TAIL_LINES=200          # quante righe finali del log analizzare per errori
 
 VERBOSE=0
-[[ "${1:-}" == "--verbose" || "${1:-}" == "-v" ]] && VERBOSE=1
+PAUSE=0
+for arg in "$@"; do
+  case "$arg" in
+    --verbose|-v) VERBOSE=1 ;;
+    --pause|-p)   PAUSE=1 ;;
+  esac
+done
+# Se lanciato a doppio click dal Desktop (stdin non e' un tty oppure parent e' un file manager),
+# manteniamo aperta la finestra finche' l'utente non preme un tasto.
+# Euristica semplice: se stdout e' un tty ma il padre non e' una shell interattiva => pausa.
+if [[ -t 1 ]] && command -v ps >/dev/null 2>&1; then
+  PARENT_CMD=$(ps -o comm= -p "$PPID" 2>/dev/null || true)
+  case "$PARENT_CMD" in
+    bash|zsh|sh|fish|dash|ksh|tmux|screen|sshd) ;;     # lanciato da shell: niente pausa
+    *) PAUSE=1 ;;                                       # lanciato da file manager / .desktop / dock
+  esac
+fi
 
 # ---- colori ----------------------------------------------------------------
 if [[ -t 1 ]]; then
