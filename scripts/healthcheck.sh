@@ -195,11 +195,24 @@ fi
 
 # ---- riepilogo -------------------------------------------------------------
 echo
+
+# pausa finale (se lanciato a doppio click o con --pause): evita che la finestra
+# del terminale si chiuda subito senza dare il tempo di leggere il risultato.
+pause_if_needed() {
+  if [[ ${PAUSE} -eq 1 ]]; then
+    echo
+    read -n 1 -s -r -p "Premi un tasto per chiudere..."
+    echo
+  fi
+}
+
 if [[ ${FAIL} -eq 0 && ${WARN} -eq 0 ]]; then
   echo -e "${C_OK}==> Tutto OK${C_END}"
+  pause_if_needed
   exit 0
 elif [[ ${FAIL} -eq 0 ]]; then
   echo -e "${C_WARN}==> OK con ${WARN} warning${C_END}"
+  pause_if_needed
   exit 0
 else
   echo -e "${C_KO}==> ${FAIL} check falliti, ${WARN} warning${C_END}"
@@ -208,5 +221,6 @@ else
   echo "  systemctl status ${SERVICE_NAME}"
   echo "  journalctl -u ${SERVICE_NAME} -n 100 --no-pager"
   echo "  tail -n 100 ${LOG_FILE}"
+  pause_if_needed
   exit 1
 fi
