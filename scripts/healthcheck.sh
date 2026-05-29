@@ -28,7 +28,9 @@ SERVICE_NAME="meteo-tende"
 INSTALL_DIR="/home/pietro/meteo-tende-ecowitt-voicemokey"
 LOG_FILE="${INSTALL_DIR}/meteo_tende.log"
 CONFIG_FILE="${INSTALL_DIR}/config.yaml"
-MAX_LOG_AGE_MINUTES=10        # log deve essere stato aggiornato negli ultimi N minuti
+MAX_LOG_AGE_MINUTES=60        # soglia "soft": il log viene toccato solo quando c'e' qualcosa di rilevante
+                              # (trigger, warning, rientro). In condizioni meteo calme puo' restare
+                              # fermo a lungo anche con il servizio perfettamente attivo.
 ERROR_TAIL_LINES=200          # quante righe finali del log analizzare per errori
 
 VERBOSE=0
@@ -124,12 +126,14 @@ else
   if [[ ${AGE_MIN} -le ${MAX_LOG_AGE_MINUTES} ]]; then
     pass "Ultimo write log: ${AGE_MIN} min fa"
   else
-    # fuori dalla finestra oraria può essere normale (servizio in idle)
+    # Il log si scrive solo quando ci sono eventi (trigger / warning / rientro).
+    # In condizioni normali puo' restare fermo a lungo: degradato a WARN, mai FAIL.
+    # La vera prova di vita e' MainPID + /proc/PID gia' verificata sopra.
     HOUR=$(date +%H)
     if (( HOUR < 10 || HOUR >= 19 )); then
-      warn "Log fermo da ${AGE_MIN} min (fuori fascia 10:00-19:00, probabilmente normale)"
+      info "Log fermo da ${AGE_MIN} min (fuori fascia 10:00-19:00, normale)"
     else
-      fail "Log fermo da ${AGE_MIN} min (dentro fascia oraria attiva)"
+      warn "Log fermo da ${AGE_MIN} min (in fascia attiva, ma normale se meteo calmo)"
     fi
   fi
 
