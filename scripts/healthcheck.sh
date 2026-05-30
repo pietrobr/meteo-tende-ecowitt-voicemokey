@@ -139,17 +139,29 @@ else
   NOW=$(date +%s)
   AGE_MIN=$(( (NOW - LOG_MTIME) / 60 ))
 
+  # Formatta l'eta' in giorni/ore/minuti per leggibilita'
+  AGE_D=$(( AGE_MIN / 1440 ))
+  AGE_H=$(( (AGE_MIN % 1440) / 60 ))
+  AGE_M=$(( AGE_MIN % 60 ))
+  if (( AGE_D > 0 )); then
+    AGE_HUMAN="${AGE_D}g ${AGE_H}h ${AGE_M}m"
+  elif (( AGE_H > 0 )); then
+    AGE_HUMAN="${AGE_H}h ${AGE_M}m"
+  else
+    AGE_HUMAN="${AGE_M}m"
+  fi
+
   if [[ ${AGE_MIN} -le ${MAX_LOG_AGE_MINUTES} ]]; then
-    pass "Ultimo write log: ${AGE_MIN} min fa"
+    pass "Ultimo write log: ${AGE_HUMAN} fa"
   else
     # Il log si scrive solo quando ci sono eventi (trigger / warning / rientro).
     # In condizioni normali puo' restare fermo a lungo: degradato a WARN, mai FAIL.
     # La vera prova di vita e' MainPID + /proc/PID gia' verificata sopra.
     HOUR=$(date +%H)
     if (( 10#$HOUR < 10 || 10#$HOUR >= 19 )); then
-      info "Log fermo da ${AGE_MIN} min (fuori fascia 10:00-19:00, normale)"
+      info "Log fermo da ${AGE_HUMAN} (fuori fascia 10:00-19:00, normale)"
     else
-      warn "Log fermo da ${AGE_MIN} min (in fascia attiva, ma normale se meteo calmo)"
+      warn "Log fermo da ${AGE_HUMAN} (in fascia attiva, ma normale se meteo calmo)"
     fi
   fi
 
