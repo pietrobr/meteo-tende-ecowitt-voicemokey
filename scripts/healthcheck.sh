@@ -146,7 +146,7 @@ else
     # In condizioni normali puo' restare fermo a lungo: degradato a WARN, mai FAIL.
     # La vera prova di vita e' MainPID + /proc/PID gia' verificata sopra.
     HOUR=$(date +%H)
-    if (( HOUR < 10 || HOUR >= 19 )); then
+    if (( 10#$HOUR < 10 || 10#$HOUR >= 19 )); then
       info "Log fermo da ${AGE_MIN} min (fuori fascia 10:00-19:00, normale)"
     else
       warn "Log fermo da ${AGE_MIN} min (in fascia attiva, ma normale se meteo calmo)"
