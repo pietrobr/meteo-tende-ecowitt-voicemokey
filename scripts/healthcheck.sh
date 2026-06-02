@@ -174,6 +174,34 @@ else
     echo -e "  ${C_DIM}Ultimi errori:${C_END}"
     tail -n ${ERROR_TAIL_LINES} "${LOG_FILE}" | grep -E " (ERROR|CRITICAL) " | tail -n 5 | sed 's/^/    /'
   fi
+
+  # ---- 7b. ultimo trigger "alza tende" ------------------------------------
+  # Cerca nell'intero log l'ultima conferma di trigger Voice Monkey andato a
+  # buon fine. Marker: "Voice Monkey trigger OK".
+  LAST_TRIGGER_LINE=$(grep -F "Voice Monkey trigger OK" "${LOG_FILE}" 2>/dev/null | tail -n 1 || true)
+  if [[ -n "${LAST_TRIGGER_LINE}" ]]; then
+    # Timestamp = primi 19 caratteri ("YYYY-MM-DD HH:MM:SS")
+    LAST_TRIGGER_TS="${LAST_TRIGGER_LINE:0:19}"
+    LAST_TRIGGER_EPOCH=$(date -d "${LAST_TRIGGER_TS}" +%s 2>/dev/null || echo 0)
+    if [[ "${LAST_TRIGGER_EPOCH}" -gt 0 ]]; then
+      TRG_AGE_MIN=$(( (NOW - LAST_TRIGGER_EPOCH) / 60 ))
+      TRG_D=$(( TRG_AGE_MIN / 1440 ))
+      TRG_H=$(( (TRG_AGE_MIN % 1440) / 60 ))
+      TRG_M=$(( TRG_AGE_MIN % 60 ))
+      if (( TRG_D > 0 )); then
+        TRG_HUMAN="${TRG_D}g ${TRG_H}h ${TRG_M}m fa"
+      elif (( TRG_H > 0 )); then
+        TRG_HUMAN="${TRG_H}h ${TRG_M}m fa"
+      else
+        TRG_HUMAN="${TRG_M}m fa"
+      fi
+      pass "Ultimo comando 'alza tende': ${LAST_TRIGGER_TS} (${TRG_HUMAN})"
+    else
+      pass "Ultimo comando 'alza tende': ${LAST_TRIGGER_TS}"
+    fi
+  else
+    info "Nessun comando 'alza tende' registrato nel log"
+  fi
 fi
 
 # ---- 8. connettività verso le API ------------------------------------------
