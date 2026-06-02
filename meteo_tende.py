@@ -103,7 +103,7 @@ class EcowittClient:
             "application_key": self.cfg["application_key"],
             "api_key": self.cfg["api_key"],
             "mac": self.cfg["mac"],
-            "call_back": "wind,rainfall",
+            "call_back": "wind,rainfall,rainfall_piezo",
             "wind_speed_unitid": self.cfg.get("wind_speed_unitid", 7),
             "rainfall_unitid": self.cfg.get("rainfall_unitid", 12),
         }
@@ -121,7 +121,9 @@ class EcowittClient:
 
         data = payload.get("data") or {}
         wind = data.get("wind") or {}
-        rain = data.get("rainfall") or {}
+        # Alcune stazioni (es. WS90/WS85 con sensore piezoelettrico) riportano
+        # la pioggia sotto "rainfall_piezo" invece di "rainfall".
+        rain = data.get("rainfall") or data.get("rainfall_piezo") or {}
 
         def _val(node: dict, key: str) -> Optional[float]:
             try:
