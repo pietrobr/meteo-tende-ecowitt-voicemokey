@@ -166,6 +166,29 @@ else
     fi
   fi
 
+  # Data piu' vecchia presente nei log (corrente + ruotati): mostra quanto
+  # storico e' ancora disponibile prima che la rotazione lo cancelli.
+  OLDEST_TS=$(grep -hoE '^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}' "${LOG_FILE}" "${LOG_FILE}".* 2>/dev/null | sort | head -n 1 || true)
+  if [[ -n "${OLDEST_TS}" ]]; then
+    OLDEST_EPOCH=$(date -d "${OLDEST_TS}" +%s 2>/dev/null || echo 0)
+    if [[ "${OLDEST_EPOCH}" -gt 0 ]]; then
+      SPAN_MIN=$(( (NOW - OLDEST_EPOCH) / 60 ))
+      SPAN_D=$(( SPAN_MIN / 1440 ))
+      SPAN_H=$(( (SPAN_MIN % 1440) / 60 ))
+      SPAN_M=$(( SPAN_MIN % 60 ))
+      if (( SPAN_D > 0 )); then
+        SPAN_HUMAN="${SPAN_D}g ${SPAN_H}h"
+      elif (( SPAN_H > 0 )); then
+        SPAN_HUMAN="${SPAN_H}h ${SPAN_M}m"
+      else
+        SPAN_HUMAN="${SPAN_M}m"
+      fi
+      pass "Storico log a partire da: ${OLDEST_TS} (${SPAN_HUMAN})"
+    else
+      pass "Storico log a partire da: ${OLDEST_TS}"
+    fi
+  fi
+
   # ---- 7. errori recenti nel log ------------------------------------------
   ERR_COUNT=$(tail -n ${ERROR_TAIL_LINES} "${LOG_FILE}" 2>/dev/null | grep -cE " (ERROR|CRITICAL) " || true)
   if [[ ${ERR_COUNT} -eq 0 ]]; then
@@ -205,11 +228,14 @@ else
   fi
 
   # ---- 7c. ultimo superamento soglia --------------------------------------
-  # Cerca nell'intero log l'ultima riga in cui un valore meteo ha superato una
-  # soglia. Il controller logga il motivo nel formato "<param>=<val>><soglia>"
+  # Cerca l'ultima riga in cui un valore meteo ha superato una soglia. Il
+  # controller logga il motivo nel formato "<param>=<val>><soglia>"
   # (es. "wind_speed=15.0>14.0"), presente sia quando invia il trigger sia
   # quando le condizioni restano critiche durante il cooldown.
-  LAST_EXCEED_LINE=$(grep -E '(wind_speed|wind_gust|rain_rate)=[0-9.]+>' "${LOG_FILE}" 2>/dev/null | tail -n 1 || true)
+  # Vengono inclusi anche i log ruotati (meteo_tende.log.1, .2, ...); le righe
+  # iniziano col timestamp "YYYY-MM-DD HH:MM:SS", quindi un sort lessicale
+  # mette l'evento piu' recente in fondo.
+  LAST_EXCEED_LINE=$(grep -hE '(wind_speed|wind_gust|rain_rate)=[0-9.]+>' "${LOG_FILE}" "${LOG_FILE}".* 2>/dev/null | sort | tail -n 1 || true)
   if [[ -n "${LAST_EXCEED_LINE}" ]]; then
     LAST_EXCEED_TS="${LAST_EXCEED_LINE:0:19}"
     # Estrai i motivi (tutto cio' che e' tra parentesi tonde, se presente)
@@ -233,7 +259,8 @@ else
     fi
     [[ -n "${LAST_EXCEED_REASONS}" ]] && info "Valori oltre soglia: ${LAST_EXCEED_REASONS}"
   else
-    info "Nessun superamento soglia registrato nel log"
+    # Nessun evento: mostrato comunque (riga neutra, sempre visibile).
+    echo -e "  ${C_DIM}[ -- ]${C_END} Nessun superamento soglia finora registrato nel log"
   fi
 fi
 
