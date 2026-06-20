@@ -70,6 +70,17 @@ info() { [[ $VERBOSE -eq 1 ]] && echo -e "  ${C_DIM}$*${C_END}"; return 0; }
 
 section() { echo; echo -e "${C_DIM}== $* ==${C_END}"; }
 
+# Concatena su stdout il log corrente e i suoi ruotati (solo quelli esistenti).
+# Evita di passare a grep file inesistenti (es. il glob meteo_tende.log.* quando
+# non c'e' rotazione) e di dipendere da opzioni grep poco portabili come -h/-o,
+# non sempre supportate (es. BusyBox grep su immagini Pi minimali).
+cat_logs() {
+  local f
+  for f in "${LOG_FILE}" "${LOG_FILE}".*; do
+    [ -f "$f" ] && cat "$f"
+  done 2>/dev/null
+}
+
 # ---- 1. unit esiste --------------------------------------------------------
 section "systemd"
 if ! systemctl list-unit-files | grep -q "^${SERVICE_NAME}\.service"; then
@@ -168,7 +179,10 @@ else
 
   # Data piu' vecchia presente nei log (corrente + ruotati): mostra quanto
   # storico e' ancora disponibile prima che la rotazione lo cancelli.
-  OLDEST_TS=$(grep -hoE '^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}' "${LOG_FILE}" "${LOG_FILE}".* 2>/dev/null | sort | head -n 1 || true)
+  # Le righe iniziano col timestamp "YYYY-MM-DD HH:MM:SS": ordino le righe
+  # complete e prendo i primi 19 caratteri della piu' vecchia (cut), cosi'
+  # evito grep -o (non sempre disponibile).
+  OLDEST_TS=$(cat_logs | grep -E '^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}' | sort | head -n 1 | cut -c1-19)
   if [[ -n "${OLDEST_TS}" ]]; then
     OLDEST_EPOCH=$(date -d "${OLDEST_TS}" +%s 2>/dev/null || echo 0)
     if [[ "${OLDEST_EPOCH}" -gt 0 ]]; then
@@ -235,11 +249,12 @@ else
   # Vengono inclusi anche i log ruotati (meteo_tende.log.1, .2, ...); le righe
   # iniziano col timestamp "YYYY-MM-DD HH:MM:SS", quindi un sort lessicale
   # mette l'evento piu' recente in fondo.
-  LAST_EXCEED_LINE=$(grep -hE '(wind_speed|wind_gust|rain_rate)=[0-9.]+>' "${LOG_FILE}" "${LOG_FILE}".* 2>/dev/null | sort | tail -n 1 || true)
+  LAST_EXCEED_LINE=$(cat_logs | grep -E '(wind_speed|wind_gust|rain_rate)=[0-9.]+>' | sort | tail -n 1)
   if [[ -n "${LAST_EXCEED_LINE}" ]]; then
     LAST_EXCEED_TS="${LAST_EXCEED_LINE:0:19}"
-    # Estrai i motivi (tutto cio' che e' tra parentesi tonde, se presente)
-    LAST_EXCEED_REASONS=$(echo "${LAST_EXCEED_LINE}" | grep -oE '\(([^)]*)\)' | head -1 | tr -d '()')
+    # Estrai i motivi (testo tra le prime parentesi tonde, se presente) con sed
+    # per non dipendere da grep -o.
+    LAST_EXCEED_REASONS=$(printf '%s' "${LAST_EXCEED_LINE}" | sed -n 's/.*(\([^)]*\)).*/\1/p')
     LAST_EXCEED_EPOCH=$(date -d "${LAST_EXCEED_TS}" +%s 2>/dev/null || echo 0)
     if [[ "${LAST_EXCEED_EPOCH}" -gt 0 ]]; then
       EXC_AGE_MIN=$(( (NOW - LAST_EXCEED_EPOCH) / 60 ))
