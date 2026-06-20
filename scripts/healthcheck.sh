@@ -182,7 +182,7 @@ else
   # Le righe iniziano col timestamp "YYYY-MM-DD HH:MM:SS": ordino le righe
   # complete e prendo i primi 19 caratteri della piu' vecchia (cut), cosi'
   # evito grep -o (non sempre disponibile).
-  OLDEST_TS=$(cat_logs | grep -E '^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}' | sort | head -n 1 | cut -c1-19)
+  OLDEST_TS=$(cat_logs | grep -aE '^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}' | sort | head -n 1 | cut -c1-19)
   if [[ -n "${OLDEST_TS}" ]]; then
     OLDEST_EPOCH=$(date -d "${OLDEST_TS}" +%s 2>/dev/null || echo 0)
     if [[ "${OLDEST_EPOCH}" -gt 0 ]]; then
@@ -204,19 +204,21 @@ else
   fi
 
   # ---- 7. errori recenti nel log ------------------------------------------
-  ERR_COUNT=$(tail -n ${ERROR_TAIL_LINES} "${LOG_FILE}" 2>/dev/null | grep -cE " (ERROR|CRITICAL) " || true)
+  # -a: tratta il log come testo anche se contiene byte binari (altrimenti grep
+  # stampa "binary file matches" senza le righe).
+  ERR_COUNT=$(tail -n ${ERROR_TAIL_LINES} "${LOG_FILE}" 2>/dev/null | grep -acE " (ERROR|CRITICAL) " || true)
   if [[ ${ERR_COUNT} -eq 0 ]]; then
     pass "Nessun ERROR/CRITICAL nelle ultime ${ERROR_TAIL_LINES} righe"
   else
     fail "${ERR_COUNT} ERROR/CRITICAL nelle ultime ${ERROR_TAIL_LINES} righe"
     echo -e "  ${C_DIM}Ultimi errori:${C_END}"
-    tail -n ${ERROR_TAIL_LINES} "${LOG_FILE}" | grep -E " (ERROR|CRITICAL) " | tail -n 5 | sed 's/^/    /'
+    tail -n ${ERROR_TAIL_LINES} "${LOG_FILE}" | grep -aE " (ERROR|CRITICAL) " | tail -n 5 | sed 's/^/    /'
   fi
 
   # ---- 7b. ultimo trigger "alza tende" ------------------------------------
   # Cerca nell'intero log l'ultima conferma di trigger Voice Monkey andato a
   # buon fine. Marker: "Voice Monkey trigger OK".
-  LAST_TRIGGER_LINE=$(grep -F "Voice Monkey trigger OK" "${LOG_FILE}" 2>/dev/null | tail -n 1 || true)
+  LAST_TRIGGER_LINE=$(grep -aF "Voice Monkey trigger OK" "${LOG_FILE}" 2>/dev/null | tail -n 1 || true)
   if [[ -n "${LAST_TRIGGER_LINE}" ]]; then
     # Timestamp = primi 19 caratteri ("YYYY-MM-DD HH:MM:SS")
     LAST_TRIGGER_TS="${LAST_TRIGGER_LINE:0:19}"
@@ -249,7 +251,7 @@ else
   # Vengono inclusi anche i log ruotati (meteo_tende.log.1, .2, ...); le righe
   # iniziano col timestamp "YYYY-MM-DD HH:MM:SS", quindi un sort lessicale
   # mette l'evento piu' recente in fondo.
-  LAST_EXCEED_LINE=$(cat_logs | grep -E '(wind_speed|wind_gust|rain_rate)=[0-9.]+>' | sort | tail -n 1)
+  LAST_EXCEED_LINE=$(cat_logs | grep -aE '(wind_speed|wind_gust|rain_rate)=[0-9.]+>' | sort | tail -n 1)
   if [[ -n "${LAST_EXCEED_LINE}" ]]; then
     LAST_EXCEED_TS="${LAST_EXCEED_LINE:0:19}"
     # Estrai i motivi (testo tra le prime parentesi tonde, se presente) con sed
