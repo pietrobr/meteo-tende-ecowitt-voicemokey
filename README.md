@@ -234,6 +234,17 @@ sudo systemctl status meteo-tende
 journalctl -u meteo-tende -f          # log in tempo reale
 ```
 
+> **Nota sul nome dell'unità**: il servizio si chiama esattamente
+> `meteo-tende` (minuscolo, con trattino). systemd distingue maiuscole e
+> minuscole: usare un nome diverso (es. `MeteoTende`) produce errori come
+> `Unit MeteoTende.service not loaded`. In caso di dubbio verifica con
+> `systemctl list-unit-files | grep -i meteo`.
+>
+> Per fermare il servizio usa `sudo systemctl stop meteo-tende` (shutdown
+> pulito). Un `sudo systemctl kill -s SIGKILL meteo-tende` simula un crash:
+> grazie a `Restart=always` systemd lo riavvia e il restart counter
+> dell'health check passa da `0` a `1` (comportamento atteso).
+
 ### Aggiornamento del codice
 
 ```bash
@@ -251,6 +262,9 @@ o per troubleshooting. Esegue 9 controlli: unit systemd presente, `active`,
 `enabled`, restart counter, processo Python in esecuzione (PID + `/proc`),
 freschezza del log applicazione, assenza di `ERROR`/`CRITICAL` nelle ultime
 righe, connettivita' verso Ecowitt e Voice Monkey, `config.yaml` leggibile.
+Mostra inoltre le soglie trigger configurate (vento, raffica, pioggia),
+l'ultimo comando "alza tende" inviato e l'ultima data/ora in cui sono stati
+rilevati valori sopra soglia.
 
 ```bash
 cd ~/meteo-tende-ecowitt-voicemokey   # o /opt/meteo-tende

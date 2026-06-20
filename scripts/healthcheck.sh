@@ -10,8 +10,9 @@
 #   5. Processo Python in esecuzione
 #   6. Log applicazione esiste e viene aggiornato (ultimo write < N minuti)
 #   7. Nessun ERROR/CRITICAL nelle ultime N righe del log
+#      + ultimo comando "alza tende" e ultimo superamento soglia
 #   8. Connettività verso Ecowitt e Voice Monkey
-#   9. config.yaml presente e leggibile
+#   9. config.yaml presente e leggibile + soglie trigger configurate
 #
 # Uso:
 #   ./healthcheck.sh
@@ -202,6 +203,38 @@ else
   else
     info "Nessun comando 'alza tende' registrato nel log"
   fi
+
+  # ---- 7c. ultimo superamento soglia --------------------------------------
+  # Cerca nell'intero log l'ultima riga in cui un valore meteo ha superato una
+  # soglia. Il controller logga il motivo nel formato "<param>=<val>><soglia>"
+  # (es. "wind_speed=15.0>14.0"), presente sia quando invia il trigger sia
+  # quando le condizioni restano critiche durante il cooldown.
+  LAST_EXCEED_LINE=$(grep -E '(wind_speed|wind_gust|rain_rate)=[0-9.]+>' "${LOG_FILE}" 2>/dev/null | tail -n 1 || true)
+  if [[ -n "${LAST_EXCEED_LINE}" ]]; then
+    LAST_EXCEED_TS="${LAST_EXCEED_LINE:0:19}"
+    # Estrai i motivi (tutto cio' che e' tra parentesi tonde, se presente)
+    LAST_EXCEED_REASONS=$(echo "${LAST_EXCEED_LINE}" | grep -oE '\(([^)]*)\)' | head -1 | tr -d '()')
+    LAST_EXCEED_EPOCH=$(date -d "${LAST_EXCEED_TS}" +%s 2>/dev/null || echo 0)
+    if [[ "${LAST_EXCEED_EPOCH}" -gt 0 ]]; then
+      EXC_AGE_MIN=$(( (NOW - LAST_EXCEED_EPOCH) / 60 ))
+      EXC_D=$(( EXC_AGE_MIN / 1440 ))
+      EXC_H=$(( (EXC_AGE_MIN % 1440) / 60 ))
+      EXC_M=$(( EXC_AGE_MIN % 60 ))
+      if (( EXC_D > 0 )); then
+        EXC_HUMAN="${EXC_D}g ${EXC_H}h ${EXC_M}m fa"
+      elif (( EXC_H > 0 )); then
+        EXC_HUMAN="${EXC_H}h ${EXC_M}m fa"
+      else
+        EXC_HUMAN="${EXC_M}m fa"
+      fi
+      pass "Ultimo superamento soglia: ${LAST_EXCEED_TS} (${EXC_HUMAN})"
+    else
+      pass "Ultimo superamento soglia: ${LAST_EXCEED_TS}"
+    fi
+    [[ -n "${LAST_EXCEED_REASONS}" ]] && info "Valori oltre soglia: ${LAST_EXCEED_REASONS}"
+  else
+    info "Nessun superamento soglia registrato nel log"
+  fi
 fi
 
 # ---- 8. connettività verso le API ------------------------------------------
@@ -228,6 +261,18 @@ if [[ -r "${CONFIG_FILE}" ]]; then
   # warning se i token sono ancora i placeholder
   if grep -qE 'YOUR_|REPLACE_|<.*>' "${CONFIG_FILE}"; then
     fail "config.yaml contiene placeholder non sostituiti"
+  fi
+
+  # Soglie configurate che fanno scattare il comando "alza tende".
+  # Le chiavi sono uniche nel file, quindi un grep mirato e' sufficiente.
+  _yaml_num() { grep -E "^[[:space:]]*$1:" "${CONFIG_FILE}" 2>/dev/null | head -1 | sed -E 's/.*:[[:space:]]*([0-9.]+).*/\1/'; }
+  WIND_SPEED_MAX=$(_yaml_num wind_speed_max)
+  WIND_GUST_MAX=$(_yaml_num wind_gust_max)
+  RAIN_RATE_MAX=$(_yaml_num rain_rate_max)
+  if [[ -n "${WIND_SPEED_MAX}${WIND_GUST_MAX}${RAIN_RATE_MAX}" ]]; then
+    pass "Soglie trigger: vento ${WIND_SPEED_MAX:-?} km/h, raffica ${WIND_GUST_MAX:-?} km/h, pioggia ${RAIN_RATE_MAX:-?} mm/h"
+  else
+    warn "Soglie trigger non trovate in config.yaml"
   fi
 else
   fail "config.yaml mancante o non leggibile: ${CONFIG_FILE}"
