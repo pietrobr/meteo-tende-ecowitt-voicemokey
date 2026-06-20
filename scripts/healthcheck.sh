@@ -290,7 +290,13 @@ check_url() {
   local code
   code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 5 "${url}" 2>/dev/null || echo "000")
   if [[ "${code}" != "000" ]]; then
-    pass "${name} raggiungibile (HTTP ${code})"
+    # Qualsiasi risposta HTTP (anche 404 sulla root, atteso) significa che il
+    # server e' raggiungibile: rete, DNS, TLS e servizio sono attivi.
+    if [[ "${code}" == 2* ]]; then
+      pass "${name} raggiungibile (HTTP ${code})"
+    else
+      pass "${name} raggiungibile (HTTP ${code} sulla root, atteso)"
+    fi
   else
     warn "${name} non raggiungibile (${url})"
   fi
