@@ -214,13 +214,29 @@ class HysteresisController:
     # --- valutazione soglie ----------------------------------------------
 
     def _above_threshold(self, s: WeatherSample) -> list[str]:
+        # Ogni motivo e' in formato leggibile: <fenomeno> <valore> <unita'>
+        # [soglia <soglia>, oltre di +<delta>]. Cosi' nel log si capisce a colpo
+        # d'occhio quale fenomeno (pioggia/vento/raffica) ha superato la soglia,
+        # con quale valore e di quanto.
         reasons: list[str] = []
         if s.wind_speed is not None and s.wind_speed > self.wind_speed_max:
-            reasons.append(f"wind_speed={s.wind_speed:.1f}>{self.wind_speed_max}")
+            delta = s.wind_speed - self.wind_speed_max
+            reasons.append(
+                f"vento sostenuto {s.wind_speed:.1f} km/h "
+                f"[soglia {self.wind_speed_max:.1f}, oltre di +{delta:.1f}]"
+            )
         if s.wind_gust is not None and s.wind_gust > self.wind_gust_max:
-            reasons.append(f"wind_gust={s.wind_gust:.1f}>{self.wind_gust_max}")
+            delta = s.wind_gust - self.wind_gust_max
+            reasons.append(
+                f"raffica {s.wind_gust:.1f} km/h "
+                f"[soglia {self.wind_gust_max:.1f}, oltre di +{delta:.1f}]"
+            )
         if s.rain_rate is not None and s.rain_rate > self.rain_rate_max:
-            reasons.append(f"rain_rate={s.rain_rate:.2f}>{self.rain_rate_max}")
+            delta = s.rain_rate - self.rain_rate_max
+            reasons.append(
+                f"pioggia {s.rain_rate:.2f} mm/h "
+                f"[soglia {self.rain_rate_max:.2f}, oltre di +{delta:.2f}]"
+            )
         return reasons
 
     def _below_reset(self, s: WeatherSample) -> bool:
@@ -240,7 +256,10 @@ class HysteresisController:
 
         if self.state == State.IDLE:
             if above:
-                self.log.warning("Soglia superata (%s): invio trigger.", ", ".join(reasons))
+                self.log.warning(
+                    "Soglia superata (%s): invio comando alza tende.",
+                    "; ".join(reasons),
+                )
                 if trigger_fn():
                     self.state = State.TRIGGERED
                     self.last_trigger_at = now
@@ -259,15 +278,22 @@ class HysteresisController:
             # condizioni di nuovo (o ancora) sopra soglia
             self.calm_since = None
             if in_cooldown:
+                residui = (self.cooldown - (now - self.last_trigger_at)).total_seconds() / 60.0
+                scade_alle = (self.last_trigger_at + self.cooldown).strftime("%H:%M:%S")
                 self.log.info(
-                    "Soglia ancora superata (%s) ma in cooldown (%.1f min residui).",
-                    ", ".join(reasons),
-                    (self.cooldown - (now - self.last_trigger_at)).total_seconds() / 60.0,
+                    "Soglia ancora superata (%s) ma tende gia' alzate; "
+                    "cooldown attivo: %.1f min residui, scade alle %s, comando NON rinviato.",
+                    "; ".join(reasons),
+                    residui,
+                    scade_alle,
                 )
             else:
+                elapsed = (now - self.last_trigger_at).total_seconds() / 60.0
                 self.log.warning(
-                    "Cooldown scaduto e condizioni ancora critiche (%s): rinvio trigger.",
-                    ", ".join(reasons),
+                    "Cooldown scaduto: %.0f min dall'ultimo comando, condizioni ancora "
+                    "critiche (%s); rinvio comando alza tende.",
+                    elapsed,
+                    "; ".join(reasons),
                 )
                 if trigger_fn():
                     self.last_trigger_at = now

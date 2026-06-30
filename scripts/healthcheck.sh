@@ -244,14 +244,17 @@ else
   fi
 
   # ---- 7c. ultimo superamento soglia --------------------------------------
-  # Cerca l'ultima riga in cui un valore meteo ha superato una soglia. Il
-  # controller logga il motivo nel formato "<param>=<val>><soglia>"
-  # (es. "wind_speed=15.0>14.0"), presente sia quando invia il trigger sia
-  # quando le condizioni restano critiche durante il cooldown.
+  # Cerca l'ultima riga in cui un valore meteo ha superato una soglia, presente
+  # sia quando il controller invia il comando sia quando le condizioni restano
+  # critiche durante il cooldown. Vengono riconosciuti due formati:
+  #   - nuovo (leggibile):  "vento sostenuto 15.0 km/h [soglia 14.0, ...]",
+  #                         "raffica ... km/h", "pioggia 0.30 mm/h [...]"
+  #   - vecchio (log ruotati pre-aggiornamento): "<param>=<val>><soglia>"
+  #     es. "wind_speed=15.0>14.0".
   # Vengono inclusi anche i log ruotati (meteo_tende.log.1, .2, ...); le righe
   # iniziano col timestamp "YYYY-MM-DD HH:MM:SS", quindi un sort lessicale
   # mette l'evento piu' recente in fondo.
-  LAST_EXCEED_LINE=$(cat_logs | grep -aE '(wind_speed|wind_gust|rain_rate)=[0-9.]+>' | sort | tail -n 1)
+  LAST_EXCEED_LINE=$(cat_logs | grep -aE '(vento sostenuto|raffica|pioggia) [0-9.]+ (km/h|mm/h)|(wind_speed|wind_gust|rain_rate)=[0-9.]+>' | sort | tail -n 1)
   if [[ -n "${LAST_EXCEED_LINE}" ]]; then
     LAST_EXCEED_TS="${LAST_EXCEED_LINE:0:19}"
     # Estrai i motivi (testo tra le prime parentesi tonde, se presente) con sed
